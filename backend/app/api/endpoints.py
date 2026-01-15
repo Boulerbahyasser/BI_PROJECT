@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 from ..data_provider import data_provider
 from ..analytics import get_kpi_overview, get_top_products, get_sales_timeseries
-from ..ml_models import perform_segmentation, forecast_sales
+from ..ml_models import perform_segmentation, forecast_sales, train_xgboost_forecast, predict_xgboost_forecast
 
 router = APIRouter()
 
@@ -32,3 +32,12 @@ def train_xgboost():
 @router.post("/ml/predict/xgboost-forecast")
 def predict_xgboost(horizon: int = 6):
     return predict_xgboost_forecast(horizon_months=horizon)
+@router.get("/stats/countries")
+def country_stats(limit: int = 10):
+    from ..analytics import get_country_stats
+    return get_country_stats(limit=limit)
+
+@router.get("/ml/loyalty")
+def loyalty_stats():
+    from ..ml_models import get_loyalty_stats
+    return get_loyalty_stats()

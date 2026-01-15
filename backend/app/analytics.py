@@ -38,7 +38,7 @@ def get_top_products(limit=10):
     if df is None: return []
     
     top = df[~df['is_return']].groupby(['StockCode', 'Description'])['TotalPrice'].sum().sort_values(ascending=False).head(limit)
-    return top.reset_index().to_dict(orient='records')
+    return top.reset_index().fillna(0).to_dict(orient='records')
 
 def get_sales_timeseries(granularity='month'):
     df = data_provider.get_data()
@@ -54,3 +54,19 @@ def get_sales_timeseries(granularity='month'):
         ts.index = ts.index.astype(str)
         
     return ts.to_dict()
+
+def get_country_stats(limit=10):
+    df = data_provider.get_data()
+    if df is None: return []
+    
+    df_clean = df[~df['is_return']]
+    
+    country_stats = df_clean.groupby('Country').agg({
+        'TotalPrice': 'sum',
+        'InvoiceNo': 'nunique'
+    }).sort_values(by='TotalPrice', ascending=False).head(limit)
+    
+    country_stats = country_stats.reset_index()
+    country_stats.columns = ['country', 'revenue', 'orders']
+    
+    return country_stats.to_dict(orient='records')

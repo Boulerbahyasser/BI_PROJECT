@@ -183,3 +183,47 @@ def forecast_sales(horizon_months=6):
         result.append({"date": date.strftime('%Y-%m'), "prediction": round(float(pred), 2)})
         
     return result
+
+def get_loyalty_stats():
+    df = data_provider.get_data()
+    if df is None: return {"segments": []}
+    
+    df_clean = df[~df['is_return']]
+    
+    snapshot_date = df_clean['InvoiceDate'].max() + pd.Timedelta(days=1)
+    rfm = df_clean.groupby('CustomerID').agg({
+        'InvoiceDate': lambda x: (snapshot_date - x.max()).days,
+        'InvoiceNo': 'nunique',
+        'TotalPrice': 'sum'
+    })
+    rfm.columns = ['Recency', 'Frequency', 'Monetary']
+    
+    # Simple Scoring (1-3)
+    rfm['R_Score'] = pd.qcut(rfm['Recency'], 3, labels=[3, 2, 1])
+    rfm['F_Score'] = pd.qcut(rfm['Frequency'].rank(method='first'), 3, labels=[1, 2, 3])
+    rfm['M_Score'] = pd.qcut(rfm['Monetary'], 3, labels=[1, 2, 3])
+    
+    rfm['RFM_Score'] = rfm[['R_Score', 'F_Score', 'M_Score']].sum(axis=1)
+    
+    def label_segment(score):
+        if score >= 8: return 'Client Fidèle'
+        if score >= 5: return 'Client Important'
+        return 'Client Perdu'
+    
+    rfm['Segment'] = rfm['RFM_Score'].apply(label_segment)
+    
+    segments = rfm['Segment'].value_counts(normalize=True).round(4) * 100
+    counts = rfm['Segment'].value_counts()
+    
+    result = []
+    for name, percentage in segments.items():
+        result.append({
+            "name": name,
+            "percentage": percentage,
+            "count": int(counts[name])
+        })
+        
+    return {
+        "segments": result,
+        "total_clients": int(len(rfm))
+    }
